@@ -17,6 +17,14 @@ struct DiscoverEvent
   DeviceID id;
   int8_t rssi;
 
+  struct Compare
+  {
+    bool operator ()(const DiscoverEvent &a, const DiscoverEvent &b) const
+    {
+      return a.id < b.id;
+    }
+  };
+
   DiscoverEvent(uint64_t time, DeviceID id, int8_t rssi)
      : time(time),
        id(id),

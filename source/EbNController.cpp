@@ -62,8 +62,6 @@ void EbNController::run()
 
     case EbNRadio::Action::Discover:
       {
-        uint64_t time = getTimeMS();
-
         list<DiscoverEvent> discovered = radio_->discover();
         list<pair<DeviceID, uint64_t> > newlyDiscovered;
         set<DeviceID> toHandshake = hystPolicy_.discovered(discovered, newlyDiscovered);
