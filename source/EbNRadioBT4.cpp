@@ -2,6 +2,7 @@
 
 #include <stdexcept>
 
+#include "AndroidWake.h"
 #include "RSErasureDecoder.h"
 #include "Timing.h"
 
@@ -344,7 +345,6 @@ BitMap EbNRadioBT4::generateAdvert(size_t advertNum)
     }
     prefix.copyFrom(dhExchange_.getPublicX(), 0, ADV_N_LOG2, keySize_);
 
-    // TODO: Put this segmented Bloom filter creation code in a function
     uint32_t totalSize = 0;
     vector<uint32_t> segmentSizes;
     for(int s = bloomNum * BF_B; s < (bloomNum + 1) * BF_B; s++)
@@ -526,7 +526,6 @@ bool EbNRadioBT4::processAdvert(EbNDeviceBT4 *device, uint64_t time, const uint8
       }
       else
       {
-        // TODO: Put this segmented Bloom filter creation code in a function
         uint32_t totalSize = 0;
         vector<uint32_t> segmentSizes;
         for(int s = bloomNum * BF_B; s < (bloomNum + 1) * BF_B; s++)
@@ -727,8 +726,10 @@ void EbNRadioBT4::listen()
     LOG_D("EbNRadioBT4", "Waiting to accept incoming BT4 connection");
 
     pair<int, Address> clientInfo;
-    while((clientInfo = hci_.acceptBT(listenSock)).first != -1)
+    while((clientInfo = hci_.acceptBT4(listenSock)).first != -1)
     {
+      AndroidWake::grab("EbNListen");
+
       int clientSock = clientInfo.first;
       Address clientAddress = clientInfo.second;
 
@@ -778,6 +779,8 @@ void EbNRadioBT4::listen()
       }
 
       close(clientSock);
+
+      AndroidWake::release("EbNListen");
     }
 
     close(listenSock);
