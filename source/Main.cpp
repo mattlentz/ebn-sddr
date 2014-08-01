@@ -452,9 +452,6 @@ int main(int argc, char **argv)
         char *end;
         int numAdverts = strtol(options[PSICMP].arg, &end, 10);
 
-        shared_ptr<EbNRadio> sender = setupRadio(config);
-        sender->setAdvertisedSet(randLinkValues);
-
         shared_ptr<EbNRadio> receiver = setupRadio(config);
         receiver->setListenSet(randLinkValues);
 
@@ -467,11 +464,14 @@ int main(int argc, char **argv)
         {
         case EbNRadio::Version::Bluetooth2:
         {
-          EbNRadioBT2 *lowSender = dynamic_cast<EbNRadioBT2 *>(sender.get());
           EbNRadioBT2 *lowReceiver = dynamic_cast<EbNRadioBT2 *>(receiver.get());
 
           for(int r = 0; r < 50; r++)
           {
+            shared_ptr<EbNRadio> sender = setupRadio(config);
+            EbNRadioBT2 *lowSender = dynamic_cast<EbNRadioBT2 *>(sender.get());
+            sender->setAdvertisedSet(randLinkValues);
+
             EbNDeviceBT2 device(0, Address(), 0, 0, randLinkValues);
 
             vector<BitMap> adverts(numAdverts);
