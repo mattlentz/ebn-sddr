@@ -109,11 +109,6 @@ set<DeviceID> EbNRadioBT2NR::handshake(const set<DeviceID> &deviceIDs)
       break;
     }
 
-    if(device->getAddress().toByteArray()[0] != 0x66 && device->getAddress().toByteArray()[0] != 0x81)
-    {
-      continue;
-    }
-
     string remoteName;
     bool readOK = hci_.readRemoteName(remoteName, device->getAddress(), device->clockOffset_, device->pageScanMode_, 2500);
     bool lengthOK = (BinaryToUTF8::getNumEncodedBits(NAME_DECODED_SIZE) == (remoteName.size() * 8));
