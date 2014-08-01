@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <list>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -23,6 +24,7 @@ protected:
   float matchingPFalse_;
   SharedSecretList sharedSecrets_;
   SharedSecretList secretsToReport_;
+  std::mutex sharedSecretsMutex_;
   std::list<RSSIEvent> rssiToReport_;
   uint64_t lastReportTime_;
   bool confirmed_;
@@ -43,7 +45,7 @@ public:
   void updateMatching(const BloomFilter *bloom, const uint8_t *prefix, uint32_t prefixSize, float pFalseDelta);
   float getMatchingPFalse() const;
 
-  const SharedSecretList& getSharedSecrets() const;
+  SharedSecretList getSharedSecrets();
   void addSharedSecret(const SharedSecret &secret);
   void confirmPassive(const BloomFilter *bloom, const uint8_t *prefix, uint32_t prefixSize, float threshold);
   void confirmPassive(const BloomFilter *bloom, const uint8_t *prefix, uint32_t prefixSize, float threshold, float pFalseDelta);
@@ -83,8 +85,9 @@ inline float EbNDevice::getMatchingPFalse() const
   return matchingPFalse_;
 }
 
-inline const SharedSecretList& EbNDevice::getSharedSecrets() const
+inline SharedSecretList EbNDevice::getSharedSecrets()
 {
+  std::lock_guard<std::mutex> sharedSecretsLock(sharedSecretsMutex_);
   return sharedSecrets_;
 }
 

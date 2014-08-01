@@ -29,23 +29,25 @@ EbNRadioBT2PSI::EbNRadioBT2PSI(size_t keySize, ConfirmScheme confirmScheme, Memo
 
 void EbNRadioBT2PSI::setAdvertisedSet(const LinkValueList &advertisedSet)
 {
-  EbNRadio::setAdvertisedSet(advertisedSet);
+  lock_guard<mutex> setLock(setMutex_);
+  advertisedSet_ = advertisedSet;
 
-  psiServerData.clear();
+  psiServerData_.clear();
   for(auto it = advertisedSet.cbegin(); it != advertisedSet.cend(); it++)
   {
-    psiServerData.push_back(string((char *)it->get(), dhExchange_.getKeySize() / 8));
+    psiServerData_.push_back(string((char *)it->get(), dhExchange_.getKeySize() / 8));
   }
 }
 
 void EbNRadioBT2PSI::setListenSet(const LinkValueList &listenSet)
 {
-  EbNRadio::setListenSet(listenSet);
+  lock_guard<mutex> setLock(setMutex_);
+  listenSet_ = listenSet;
 
-  psiClientData.clear();
+  psiClientData_.clear();
   for(auto it = listenSet.cbegin(); it != listenSet.cend(); it++)
   {
-    psiClientData.push_back(string((char *)it->get(), dhExchange_.getKeySize() / 8));
+    psiClientData_.push_back(string((char *)it->get(), dhExchange_.getKeySize() / 8));
   }
 }
 
@@ -76,7 +78,7 @@ list<DiscoverEvent> EbNRadioBT2PSI::discover()
   }
 
   unique_lock<mutex> discDevicesLock(discDevicesMutex_);
-  discDevices.clear();
+  discDevices_.clear();
   discDevicesLock.unlock();
 
   list<DiscoverEvent> discovered;
@@ -123,7 +125,7 @@ set<DeviceID> EbNRadioBT2PSI::handshake(const set<DeviceID> &deviceIDs)
       LOG_D("EbNRadioBT2PSI", "Attempting to connect to device (ID %d, Address %s)", device->getID(), device->getAddress().toString().c_str());
 
       unique_lock<mutex> discDevicesLock(discDevicesMutex_);
-      if(discDevices.insert(device->getAddress()).second == false)
+      if(discDevices_.insert(device->getAddress()).second == false)
       {
         LOG_D("EbNRadioBT2PSI", "Skipping connection, already performed during this discovery period");
         break;
@@ -141,8 +143,12 @@ set<DeviceID> EbNRadioBT2PSI::handshake(const set<DeviceID> &deviceIDs)
         psiServer->SetAdaptive();
         psiClient->Setup(1024);
         psiServer->Setup(1024);
-        psiClient->LoadData(psiClientData);
-        psiServer->LoadData(psiServerData);
+
+        unique_lock<mutex> setLock(setMutex_);
+        psiClient->LoadData(psiClientData_);
+        psiServer->LoadData(psiServerData_);
+        setLock.unlock();
+
         psiClient->Initialize(1024);
         psiServer->Initialize(1024);
 
@@ -180,13 +186,13 @@ set<DeviceID> EbNRadioBT2PSI::handshake(const set<DeviceID> &deviceIDs)
 
           if(success && (success = hci_.recv(sock, message.data(), messageSize, 30000)))
           {
-            vector<string> publishedData = parseMessage(message);
+            vector<string> publishedData = parsePSIMessage(message);
             psiClient->StoreData(publishedData);
 
             output.clear();
             (psiClient->*(psiClient->m_vecRequest[0]))(output);
 
-            constructMessage(message, output);
+            constructPSIMessage(message, output);
             LOG_D("EbNRadioBT2PSI", "HC1 - Sending message of size %zu", message.size());
             success = hci_.send(sock, message.data(), message.size(), 30000);
           }
@@ -199,7 +205,7 @@ set<DeviceID> EbNRadioBT2PSI::handshake(const set<DeviceID> &deviceIDs)
 
           if(success && (success = hci_.recv(sock, message.data(), messageSize, 30000)))
           {
-            vector<string> input = parseMessage(message);
+            vector<string> input = parsePSIMessage(message);
             (psiClient->*(psiClient->m_vecOnResponse[0]))(input);
 
             LOG_D("EbNRadioBT2PSI", "HC2 - Result (Size = %zu)", psiClient->m_vecResult.size());
@@ -211,7 +217,7 @@ set<DeviceID> EbNRadioBT2PSI::handshake(const set<DeviceID> &deviceIDs)
         {
           output.clear();
           psiServer->PublishData(output);
-          constructMessage(message, output);
+          constructPSIMessage(message, output);
           LOG_D("EbNRadioBT2PSI", "HS1 - Sending message of size %zu", message.size());
           success = hci_.send(sock, message.data(), message.size(), 30000);
         }
@@ -223,17 +229,19 @@ set<DeviceID> EbNRadioBT2PSI::handshake(const set<DeviceID> &deviceIDs)
 
           if(success && (success = hci_.recv(sock, message.data(), messageSize, 30000)))
           {
-            vector<string> input = parseMessage(message);
+            vector<string> input = parsePSIMessage(message);
             (psiServer->*(psiServer->m_vecOnRequest[0]))(input);
 
             output.clear();
             (psiServer->*(psiServer->m_vecResponse[0]))(output);
 
-            constructMessage(message, output);
+            constructPSIMessage(message, output);
             LOG_D("EbNRadioBT2PSI", "HS2 - Sending message of size %zu", message.size());
             success = hci_.send(sock, message.data(), message.size(), 30000);
           }
         }
+
+        // TODO: Process the result to update matching set
 
         delete psiClient;
         delete psiServer;
@@ -315,17 +323,17 @@ void EbNRadioBT2PSI::listen()
     LOG_D("EbNRadioBT2PSI", "Waiting to accept incoming BT2 connection");
 
     pair<int, Address> clientInfo;
-    while((clientInfo = hci_.acceptBT(listenSock)).first != -1)
+    while((clientInfo = hci_.acceptBT2(listenSock)).first != -1)
     {
+      AndroidWake::grab("EbNListen");
+
       int sock = clientInfo.first;
       Address clientAddress = clientInfo.second;
       LOG_D("EbNRadioBT2PSI", "Accepted incoming connection from %s", clientAddress.toString().c_str());
 
       unique_lock<mutex> discDevicesLock(discDevicesMutex_);
-      discDevices.insert(clientAddress);
+      discDevices_.insert(clientAddress);
       discDevicesLock.unlock();
-
-      AndroidWake::grab("EbNListen");
 
       Client *psiClient = new JL10_Client();
       Server *psiServer = new JL10_Server();
@@ -333,8 +341,12 @@ void EbNRadioBT2PSI::listen()
       psiServer->SetAdaptive();
       psiClient->Setup(1024);
       psiServer->Setup(1024);
-      psiClient->LoadData(psiClientData);
-      psiServer->LoadData(psiServerData);
+
+      unique_lock<mutex> setLock(setMutex_);
+      psiClient->LoadData(psiClientData_);
+      psiServer->LoadData(psiServerData_);
+      setLock.unlock();
+
       psiClient->Initialize(1024);
       psiServer->Initialize(1024);
 
@@ -355,6 +367,7 @@ void EbNRadioBT2PSI::listen()
           if(dhExchange_.computeSharedSecret(sharedSecret, remotePublic.data()))
           {
             LOG_E("EbNRadioBT2PSI", "Computed shared secret!");
+            // TODO: Add shared secret for the device
           }
           else
           {
@@ -368,7 +381,7 @@ void EbNRadioBT2PSI::listen()
       {
         output.clear();
         psiServer->PublishData(output);
-        constructMessage(message, output);
+        constructPSIMessage(message, output);
         LOG_D("EbNRadioBT2PSI", "LS1 - Sending message of size %zu", message.size());
         success = hci_.send(sock, message.data(), message.size(), 30000);
       }
@@ -380,13 +393,13 @@ void EbNRadioBT2PSI::listen()
 
         if(success && (success = hci_.recv(sock, message.data(), messageSize, 30000)))
         {
-          vector<string> input = parseMessage(message);
+          vector<string> input = parsePSIMessage(message);
           (psiServer->*(psiServer->m_vecOnRequest[0]))(input);
 
           output.clear();
           (psiServer->*(psiServer->m_vecResponse[0]))(output);
 
-          constructMessage(message, output);
+          constructPSIMessage(message, output);
           LOG_D("EbNRadioBT2PSI", "LS2 - Sending message of size %zu", message.size());
           success = hci_.send(sock, message.data(), message.size(), 30000);
         }
@@ -400,13 +413,13 @@ void EbNRadioBT2PSI::listen()
 
         if(success && (success = hci_.recv(sock, message.data(), messageSize, 30000)))
         {
-          vector<string> publishedData = parseMessage(message);
+          vector<string> publishedData = parsePSIMessage(message);
           psiClient->StoreData(publishedData);
 
           output.clear();
           (psiClient->*(psiClient->m_vecRequest[0]))(output);
 
-          constructMessage(message, output);
+          constructPSIMessage(message, output);
           LOG_D("EbNRadioBT2PSI", "LC1 - Sending message of size %zu", message.size());
           success = hci_.send(sock, message.data(), message.size(), 30000);
         }
@@ -419,12 +432,14 @@ void EbNRadioBT2PSI::listen()
 
         if(success && (success = hci_.recv(sock, message.data(), messageSize, 30000)))
         {
-          vector<string> input = parseMessage(message);
+          vector<string> input = parsePSIMessage(message);
           (psiClient->*(psiClient->m_vecOnResponse[0]))(input);
 
           LOG_D("EbNRadioBT2PSI", "LC2 - Result (Size = %zu)", psiClient->m_vecResult.size());
         }
       }
+
+      // TODO: Process the result to update matching set
 
       close(sock);
 
@@ -438,7 +453,7 @@ void EbNRadioBT2PSI::listen()
   }
 }
 
-void EbNRadioBT2PSI::constructMessage(vector<uint8_t> &message, vector<string> input)
+void EbNRadioBT2PSI::constructPSIMessage(vector<uint8_t> &message, vector<string> input)
 {
   size_t pos = 0;
 
@@ -459,7 +474,7 @@ void EbNRadioBT2PSI::constructMessage(vector<uint8_t> &message, vector<string> i
   }
 }
 
-vector<string> EbNRadioBT2PSI::parseMessage(const vector<uint8_t> &message)
+vector<string> EbNRadioBT2PSI::parsePSIMessage(const vector<uint8_t> &message)
 {
   size_t pos = 0;
   vector<string> output;

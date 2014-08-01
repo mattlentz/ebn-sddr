@@ -16,6 +16,7 @@ EbNDevice::EbNDevice(DeviceID id, const Address &address, const LinkValueList &l
      matchingPFalse_(1),
      sharedSecrets_(),
      secretsToReport_(),
+     sharedSecretsMutex_(),
      rssiToReport_(),
      lastReportTime_(0),
      confirmed_(false),
@@ -59,6 +60,8 @@ void EbNDevice::addSharedSecret(const SharedSecret &secret)
   bool found = false;
   SharedSecret::Equal equalFunc;
 
+  lock_guard<mutex> sharedSecretsLock(sharedSecretsMutex_);
+
   for(auto it = sharedSecrets_.begin(); it != sharedSecrets_.end(); it++)
   {
     if(equalFunc(secret, *it))
@@ -97,6 +100,8 @@ void EbNDevice::confirmPassive(const BloomFilter *bloom, const uint8_t *prefix, 
 
 void EbNDevice::confirmPassive(const BloomFilter *bloom, const uint8_t *prefix, uint32_t prefixSize, float threshold, float pFalseDelta)
 {
+  lock_guard<mutex> sharedSecretsLock(sharedSecretsMutex_);
+
   for(auto it = sharedSecrets_.begin(); it != sharedSecrets_.end(); it++)
   {
     SharedSecret &secret = *it;
@@ -153,6 +158,8 @@ bool EbNDevice::getEncounterInfo(EncounterEvent &dest, uint64_t rssiReportingInt
   }
   else
   {
+    lock_guard<mutex> sharedSecretsLock(sharedSecretsMutex_);
+
     const bool reportSecrets = !secretsToReport_.empty();
     const bool reportMatching = updatedMatching_;
     const bool reportRSSI = !rssiToReport_.empty() && ((getTimeMS() - lastReportTime_) > rssiReportingInterval);

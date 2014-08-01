@@ -40,10 +40,10 @@ private:
   uint32_t advertNum_;
   std::thread listenThread_;
 
-  vector<string> psiClientData;
-  vector<string> psiServerData;
+  vector<string> psiClientData_;
+  vector<string> psiServerData_;
+  std::unordered_set<Address, Address::Hash, Address::Equal> discDevices_;
   std::mutex discDevicesMutex_;
-  std::unordered_set<Address, Address::Hash, Address::Equal> discDevices;
 
 public:
   EbNRadioBT2PSI(size_t keySize, ConfirmScheme confirmScheme, MemoryScheme memoryScheme, int adapterID);
@@ -62,8 +62,8 @@ private:
 
   void listen();
 
-  void constructMessage(std::vector<uint8_t> &message, std::vector<string> input);
-  std::vector<string> parseMessage(const std::vector<uint8_t> &message);
+  void constructPSIMessage(std::vector<uint8_t> &message, std::vector<string> input);
+  std::vector<string> parsePSIMessage(const std::vector<uint8_t> &message);
 };
 
 #endif  // EBNRADIOBT2PSI_H
