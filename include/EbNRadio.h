@@ -126,6 +126,8 @@ protected:
   DeviceID generateDeviceID();
 
   void fillBloomFilter(BloomFilter *bloom, const uint8_t *prefix, uint32_t prefixSize, bool includePassive = true);
+  void fillBloomFilter(BloomFilter *bloom, const LinkValueList &advertisedSet, const uint8_t *prefix, uint32_t prefixSize, bool includePassive = true);
+
 
   void addRecentDevice(EbNDevice *device);
   void removeRecentDevice(DeviceID id);

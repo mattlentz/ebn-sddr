@@ -74,6 +74,12 @@ void EbNRadio::setListenSet(const LinkValueList &listenSet)
 
 void EbNRadio::fillBloomFilter(BloomFilter *bloom, const uint8_t *prefix, uint32_t prefixSize, bool includePassive)
 {
+  lock_guard<mutex> setLock(setMutex_);
+  fillBloomFilter(bloom, advertisedSet_, prefix, prefixSize, includePassive);
+}
+
+void EbNRadio::fillBloomFilter(BloomFilter *bloom, const LinkValueList &advertisedSet, const uint8_t *prefix, uint32_t prefixSize, bool includePassive)
+{
   int numRandom = 0;
 
   // Inserting link values from the advertised set
@@ -83,15 +89,11 @@ void EbNRadio::fillBloomFilter(BloomFilter *bloom, const uint8_t *prefix, uint32
     maxAdvert = BF_N - BF_N_PASSIVE;
   }
 
-  unique_lock<mutex> setLock(setMutex_);
-
   int numAdvert = 0;
-  for(LinkValueList::iterator it = advertisedSet_.begin(); (it != advertisedSet_.end()) && (numAdvert < maxAdvert);  it++, numAdvert++)
+  for(auto it = advertisedSet.cbegin(); (it != advertisedSet.cend()) && (numAdvert < maxAdvert);  it++, numAdvert++)
   {
     bloom->add(prefix, prefixSize, it->get(), it->size());
   }
-
-  setLock.unlock();
 
   numRandom += (maxAdvert - numAdvert);
 
@@ -105,7 +107,7 @@ void EbNRadio::fillBloomFilter(BloomFilter *bloom, const uint8_t *prefix, uint32
 
     for(auto devIt = recentDevices_.begin(); devIt != recentDevices_.end(); devIt++)
     {
-      const SharedSecretList &deviceSecrets = (*devIt)->getSharedSecrets();
+      SharedSecretList deviceSecrets = (*devIt)->getSharedSecrets();
       for(auto secIt = deviceSecrets.begin(); secIt != deviceSecrets.end(); secIt++)
       {
         // Only include secrets which were not actively confirmed
