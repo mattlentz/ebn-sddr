@@ -202,7 +202,7 @@ void EbNRadioBT2::processEIRResponse(list<DiscoverEvent> *discovered, const EIRI
   }
   else
   {
-    LOG_D("EbNRadioBT2", "Discovered non-EbN device (Address %s) [Checksum OK? %d] [Length OK? %d] [Type OK? %d]", resp->address.toString().c_str(), addressOK, lengthOK, typeOK);
+    LOG_D("EbNRadioBT2", "Discovered non-EbN device (Address %s) [Checksum OK? %d] [Length OK? %d (%d)] [Type OK? %d (%d)]", resp->address.toString().c_str(), addressOK, lengthOK, resp->data[0], typeOK, resp->data[1]);
   }
 }
 
@@ -240,7 +240,7 @@ BitMap EbNRadioBT2::generateAdvert(size_t advertNum)
 
   BloomFilter advertBloom(BF_N, BF_M, BF_K);
   fillBloomFilter(&advertBloom, prefix.toByteArray(), prefix.sizeBytes());
-  advert.copyFrom(advertBloom.toByteArray(), 0, advertOffset, advertBloom.M());
+  advert.copyFrom(advertBloom.toByteArray(), 0, advertOffset, advertBloom.M() - 16);
 
   return advert;
 }
