@@ -789,7 +789,7 @@ int BluetoothHCI::listenBT4()
   return sockListen;
 }
 
-pair<int, Address> BluetoothHCI::acceptBT(int sockListen)
+pair<int, Address> BluetoothHCI::acceptBT2(int sockListen)
 {
   struct pollfd pollDesc;
   pollDesc.fd = sockListen;
@@ -803,12 +803,38 @@ pair<int, Address> BluetoothHCI::acceptBT(int sockListen)
   else
   {
     struct sockaddr_rc addr;
-    socklen_t addrLength = sizeof(sockaddr_l2);
+    socklen_t addrLength = sizeof(sockaddr_rc);
     int sockClient = accept(sockListen, (struct sockaddr *)&addr, &addrLength);
     Address address;
     if(sockClient >= 0)
     {
       address = Address(6, addr.rc_bdaddr.b);
+    }
+
+    return make_pair(sockClient, address);
+  }
+}
+
+pair<int, Address> BluetoothHCI::acceptBT4(int sockListen)
+{
+  struct pollfd pollDesc;
+  pollDesc.fd = sockListen;
+  pollDesc.events = POLLIN;
+
+  int error = poll(&pollDesc, 1, -1);
+  if(error <= 0)
+  {
+    return make_pair(-1, Address());
+  }
+  else
+  {
+    struct sockaddr_l2 addr;
+    socklen_t addrLength = sizeof(sockaddr_l2);
+    int sockClient = accept(sockListen, (struct sockaddr *)&addr, &addrLength);
+    Address address;
+    if(sockClient >= 0)
+    {
+      address = Address(6, addr.l2_bdaddr.b);
     }
 
     return make_pair(sockClient, address);

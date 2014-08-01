@@ -214,7 +214,8 @@ public:
   static int connectBT4(const Address &address, int64_t timeout);
   static int listenBT2(uint8_t port);
   static int listenBT4();
-  static std::pair<int, Address> acceptBT(int sockListen);
+  static std::pair<int, Address> acceptBT2(int sockListen);
+  static std::pair<int, Address> acceptBT4(int sockListen);
   static bool send(int sock, const uint8_t *message, size_t size, int64_t timeout);
   static bool recv(int sock, uint8_t *dest, size_t size, int64_t timeout);
   static bool waitClose(int sock, int64_t timeout);
