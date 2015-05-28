@@ -1,5 +1,6 @@
 This is our research prototype code used in the evaluation of our secure
-device discovery and recognition (SDDR) protocol, as presented in our paper:
+device discovery and recognition (SDDR) protocol, as presented in our
+paper:
 
 SDDR: Light-Weight, Secure Mobile Encounters
 Matthew Lentz, Viktor Erdelyi, Paarijaat Aditya,
@@ -27,8 +28,9 @@ Download/Build: Android Source for android-4.1.2 on Galaxy Nexus ("maguro")
 Download/Install: Galaxy Nexus ("maguro") Factory Image for 4.1.2
 (See https://developers.google.com/android/nexus/images)
 
-Software to root the device. The commands provided below assume that they
-are executed on a root shell on the device.
+Software to root the device. The "adb" commands, as well as our SDDR
+application, assume that they are executed on a root privileges on the
+device.
 
 
 ###########################################################################
@@ -39,7 +41,8 @@ In order to let the device suspend between SDDR protocol actions (e.g.,
 discovery), the AWake java application must be built and installed on the
 phone. Use the following commands:
 
-cd awake
+cd <Root Directory>/awake
+android update project --path .
 ant debug
 adb install -r bin/AWake-debug.apk
 
@@ -50,7 +53,7 @@ adb install -r bin/AWake-debug.apk
 
 Use the following commands to build the third-party libraries for Android.
 This must only be done for GMP and Google Protocol Buffers, since other
-Makefiles were easy enough to port to the Android.mk format.
+Makefiles were simple enough to port to the Android.mk format.
 
 NOTE: This assumes that $NDKROOT points to the root directory of the NDK.
 
@@ -61,11 +64,11 @@ $NDKROOT/build/tools/make-standalone-toolchain.sh \
 
 export PATH=/tmp/ndkchain/bin:$PATH
 
-cd gmp
+cd <Root Directory>/third-party/gmp
 ./configure --host=arm-linux-androideabi
 make -j4
 
-cd google
+cd <Root Directory>/third-party/google
 ./configure --host=arm-linux-androideabi
 make -j4
 
@@ -76,6 +79,8 @@ make -j4
 
 Use the following commands to build and install the application:
 
+cd <Root Directory>
+export AOSP_ROOT=<Root Directory of Android 4.1.2 Source>
 ndk-build -j4
 
 adb root
@@ -90,6 +95,8 @@ adb push libs/armeabi-v7a/libgnustl_shared.so /system/lib
 
 This application builds with the above SDDR application. Use the following
 commands to install the application:
+
+cd <Root Directory>
 
 adb root
 adb remount
@@ -139,8 +146,8 @@ For ResolveAddr in BT4.0 use the following command:
 [[Figure 4: Estimated daily battery life consumption while running...]]
 
 None. This is based on results from Table 2 and 3, but also looking at 1,3
-devices instead of just 5 nearby devices for use in extrapolating the energy
-costs associated with the SDDR protocol according to Equation 1.
+devices instead of just 5 nearby devices for use in extrapolating the
+energy costs associated with the SDDR protocol according to Equation 1.
 
 
 [[Smokescreen Conservative Energy Estimates]]

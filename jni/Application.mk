@@ -6,8 +6,7 @@ APP_GNUSTL_FORCE_CPP_FEATURES := exceptions rtti
 
 NDK_TOOLCHAIN_VERSION = 4.8
 
-# Specifying the exact phone model and corresponding AOSP framework location
+# Specifying the exact phone model
 PHONEMODEL := maguro
 PHONEMODEL_CAPS := MAGURO
-AOSP_ROOT := /home/matt/Projects/android/system-4.1.2
 
